@@ -9,16 +9,18 @@ from engines.pricing_engine import calculate_project_pricing
 from engines.roi_engine import calculate_roi
 from engines.proposal_pdf_generator import generate_dual_reports
 
-
 st.set_page_config(layout="wide")
 st.title("⛏️ Copiloto Minero v17 — Terminal Pericial")
 
-# =========================================================
-# SESSION STATE INIT
-# =========================================================
+# =====================================================
+# SESSION STATE
+# =====================================================
 
 if "documents" not in st.session_state:
     st.session_state.documents = []
+
+if "discarded_docs" not in st.session_state:
+    st.session_state.discarded_docs = []
 
 if "scoring_results" not in st.session_state:
     st.session_state.scoring_results = None
@@ -26,95 +28,65 @@ if "scoring_results" not in st.session_state:
 if "scenario_results" not in st.session_state:
     st.session_state.scenario_results = None
 
-# =========================================================
-# SIDEBAR CONTEXTO PROYECTO
-# =========================================================
+# =====================================================
+# SIDEBAR — CONTEXTO PROYECTO
+# =====================================================
 
 st.sidebar.header("Contexto del Proyecto")
 
-region = st.sidebar.selectbox(
-    "Región", ["NOA", "Cuyo", "Patagonia", "Centro"]
-)
-
-mineral = st.sidebar.selectbox(
-    "Mineral", ["Litio", "Cobre", "Oro/Plata", "Otros"]
-)
-
+region = st.sidebar.selectbox("Región", ["NOA", "Cuyo", "Patagonia", "Centro"])
+mineral = st.sidebar.selectbox("Mineral", ["Litio", "Cobre", "Oro/Plata", "Otros"])
 phase = st.sidebar.selectbox(
     "Fase del Proyecto",
     ["Exploración", "Prefactibilidad", "Construcción", "Operación", "Cierre"]
 )
+tier = st.sidebar.selectbox("Tipo de Cliente", ["Major", "Mid", "Pyme"])
 
-tier = st.sidebar.selectbox(
-    "Tipo de Cliente",
-    ["Major", "Mid", "Pyme"]
-)
-
-# =========================================================
-# FASE 1 — INGESTA DOCUMENTAL
-# =========================================================
+# =====================================================
+# FASE 1 — INGESTA
+# =====================================================
 
 st.header("Fase 1 — Auditoría de Evidencia")
 
-uploaded_files = st.file_uploader(
-    "Subir documentos", accept_multiple_files=True
-)
+uploaded_files = st.file_uploader("Subir documentos", accept_multiple_files=True)
 
 axis = st.selectbox(
-    "Eje Heptágono del documento",
+    "Eje Heptágono",
     ["Político","Social","Ambiental","Hídrico","Económico","Técnico","Comunicacional"]
 )
 
-source_type = st.selectbox(
-    "Tipo de Fuente",
-    ["Oficial","Terceros","Corporativo","Prensa"]
-)
-
-recency = st.selectbox(
-    "Recencia",
-    ["<18m","18-36m",">36m"]
-)
-
-density = st.selectbox(
-    "Densidad técnica",
-    ["Alta","Media","Baja"]
-)
-
-sentiment = st.selectbox(
-    "Sentimiento",
-    ["Favor","Neutro","Contra"]
-)
+source_type = st.selectbox("Tipo Fuente", ["Oficial","Terceros","Corporativo","Prensa"])
+recency = st.selectbox("Recencia", ["<18m","18-36m",">36m"])
+density = st.selectbox("Densidad Técnica", ["Alta","Media","Baja"])
+sentiment = st.selectbox("Sentimiento", ["Favor","Neutro","Contra"])
 
 if st.button("Agregar documentos"):
     if uploaded_files:
-        new_docs = run_ingestion_pipeline(
-            uploaded_files,
-            axis,
-            source_type,
-            recency,
-            density,
-            sentiment,
+        new_docs, discarded = run_ingestion_pipeline(
+            uploaded_files, axis, source_type, recency, density, sentiment
         )
         st.session_state.documents.extend(new_docs)
-        st.success(f"{len(new_docs)} documentos agregados")
+        st.session_state.discarded_docs.extend(discarded)
 
-st.write("Documentos cargados:", len(st.session_state.documents))
+# Mostrar progreso hacia 105 fuentes
+st.subheader("Progreso Evidencial")
+st.metric("Fuentes únicas", len(st.session_state.documents), "/ 105")
 
-# =========================================================
-# RUN SCORING PIPELINE
-# =========================================================
+if st.session_state.discarded_docs:
+    st.warning(f"{len(st.session_state.discarded_docs)} documentos descartados por duplicación")
 
-if st.button("Ejecutar Auditoría"):
+# =====================================================
+# EJECUTAR AUDITORÍA
+# =====================================================
+
+if st.button("Ejecutar Auditoría Forense"):
     st.session_state.scoring_results = run_scoring_pipeline(
-        st.session_state.documents,
-        region,
-        mineral,
-        phase
+        st.session_state.documents, region, mineral, phase
     )
 
-# =========================================================
+# =====================================================
 # RESULTADOS FORENSES
-# =========================================================
+# =====================================================
 
 if st.session_state.scoring_results:
 
@@ -123,46 +95,52 @@ if st.session_state.scoring_results:
     st.header("Resultados Forenses")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("IBH Forense", round(res["IBH"], 2))
-    col2.metric("ICG", round(res["ICG"], 2))
-    col3.metric("Fricción Crítica", str(res["friction"]) + "%")
+    col1.metric("IBH", round(res["IBH"],2))
+    col2.metric("ICG", round(res["ICG"],2))
+    col3.metric("Fricción", f"{res['friction']}%")
+
+    # Curva supervivencia base
+    isp_base = calculate_survival_probability(res["IBH"], res["friction"], phase)
+    st.metric("ISP Base", f"{isp_base}%")
+
+    # Curva simple supervivencia
+    chart_data = pd.DataFrame({
+        "Fase":["Actual","Siguiente"],
+        "Supervivencia":[isp_base, isp_base*0.95]
+    })
+    st.line_chart(chart_data.set_index("Fase"))
 
     # =====================================================
-    # SURVIVAL ENGINE
+    # WAR ROOM
     # =====================================================
 
-    isp = calculate_survival_probability(res["IBH"], res["friction"], phase)
-    st.metric("Probabilidad de Supervivencia (ISP)", str(isp) + "%")
-
-    # =====================================================
-    # WAR ROOM — SOLUCIONES
-    # =====================================================
-
-    st.header("War Room — Simulación de Soluciones")
+    st.header("War Room — Simulación")
 
     selected_solutions = st.multiselect(
         "Seleccionar soluciones",
         [
             "Monitoreo Hídrico Participativo",
-            "Programa de Relacionamiento Indígena",
-            "Sistema de Alertas Ambientales",
-            "Plan de Comunicación Estratégica",
-        ],
+            "Programa Relacionamiento Indígena",
+            "Sistema Alertas Ambientales",
+            "Plan Comunicación Estratégica"
+        ]
     )
 
-    if st.button("Simular escenario"):
+    if st.button("Simular Escenario"):
         scenario = apply_solutions_and_recalculate(
-            res,
-            selected_solutions,
-            region,
-            mineral,
-            phase
+            res, selected_solutions, region, mineral, phase
         )
+
+        # recalcular ISP proyectado
+        scenario["ISP"] = calculate_survival_probability(
+            scenario["IBH"], scenario["friction"], phase
+        )
+
         st.session_state.scenario_results = scenario
 
-# =========================================================
-# RESULTADOS SIMULADOS + PRICING
-# =========================================================
+# =====================================================
+# ESCENARIO + PRICING
+# =====================================================
 
 if st.session_state.scenario_results:
 
@@ -170,13 +148,10 @@ if st.session_state.scenario_results:
 
     st.header("Escenario Proyectado")
 
-    col1, col2 = st.columns(2)
-    col1.metric("IBH Proyectado", round(scenario["IBH"], 2))
-    col2.metric("Fricción Proyectada", str(scenario["friction"]) + "%")
-
-    # =============================
-    # PRICING ENGINE
-    # =============================
+    col1, col2, col3 = st.columns(3)
+    col1.metric("IBH Proyectado", round(scenario["IBH"],2))
+    col2.metric("Fricción", f"{scenario['friction']}%")
+    col3.metric("ISP", f"{scenario['ISP']}%")
 
     pricing = calculate_project_pricing(
         ibh=scenario["IBH"],
@@ -186,19 +161,16 @@ if st.session_state.scenario_results:
     )
 
     st.header("Inversión Estimada")
-    st.metric("Fee Total USD", "$ " + str(pricing["total_usd"]))
-    st.metric("Fee Total ARS", "$ " + str(pricing["total_ars"]))
-
-    # =============================
-    # ROI ENGINE
-    # =============================
+    col1, col2 = st.columns(2)
+    col1.metric("Fee USD", f"${pricing['total_usd']}")
+    col2.metric("Fee ARS", f"${pricing['total_ars']}")
 
     roi = calculate_roi(pricing["total_usd"])
-    st.metric("Margen estimado", str(roi["margin"]) + "%")
+    st.metric("Margen", f"{roi['margin']}%")
 
-    # =============================
-    # GENERADOR DE REPORTES
-    # =============================
+    # =====================================================
+    # GENERAR REPORTES (JUEZ FINAL)
+    # =====================================================
 
     st.header("Generación de Reportes")
 
@@ -207,7 +179,9 @@ if st.session_state.scenario_results:
         icg = st.session_state.scoring_results["ICG"]
 
         if icg < 50:
-            st.warning("ICG insuficiente → se generará propuesta FBE")
+            st.warning("ICG < 50 → Se generará propuesta FBE obligatoria")
+        else:
+            st.success("Certidumbre validada → Generando Reportes Dual")
 
         generate_dual_reports(
             scoring=st.session_state.scoring_results,
