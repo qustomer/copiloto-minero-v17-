@@ -37,7 +37,7 @@ SOLUTIONS_CATALOG = {
 }
 
 
-def apply_solutions(base_scores, selected_solutions):
+def apply_solutions_and_recalculate(base_scores, selected_solutions):
     """
     Aplica mejoras de score al seleccionar soluciones en el War Room
     """
