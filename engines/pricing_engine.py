@@ -89,7 +89,7 @@ def fbe_fee(icg: float) -> float:
 # 5. Pricing principal
 # ---------------------------------------------------
 
-def run_pricing_engine(
+def calculate_project_pricing(
     ibh: float,
     isp: float,
     icg: float,
