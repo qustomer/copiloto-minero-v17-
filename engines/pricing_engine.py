@@ -1,8 +1,8 @@
-def calculate_pricing(ibh, friccion, isp): # Agregamos la 'g' al final para que coincida con app.py
-    base = 15000
-    risk_factor = (100 - ibh + friccion + (100 - isp)) / 3
-    final_price = base * (1 + risk_factor / 100)
-    return round(final_price, 0)
+def calculate_price(ibh, friccion, isp):
+    # Tu lógica de cálculo aquí...
+    base_fee = 15000 
+    # (El resto de tu código de pricing)
+    return total_final
 # Copiloto Minero v17 — Risk Adjusted Pricing Engine
 
 from engines.fx_engine import get_fx_rate
