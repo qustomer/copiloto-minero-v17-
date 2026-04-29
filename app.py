@@ -5,7 +5,7 @@ from engines.ingestion_engine import run_ingestion_pipeline
 from engines.scoring_engine import run_scoring_pipeline
 from engines.survival_engine import calculate_survival_probability
 from engines.solutions_catalog import apply_solutions_and_recalculate
-from engines.pricing_engine import calculate_price # Nota el cambio de nombre a 'calculate_price'
+from engines.pricing_engine import calculate_price
 from engines.automation_engine import run_harvester_automation
 from engines.roi_engine import calculate_roi
 from engines.proposal_pdf_generator import generate_dual_reports
