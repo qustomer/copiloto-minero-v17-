@@ -12,7 +12,9 @@ from engines.proposal_pdf_generator import generate_dual_reports
 
 st.set_page_config(layout="wide")
 st.title("⛏️ Copiloto Minero v17 — Terminal Pericial")
-
+with st.sidebar:
+    st.header("Configuración de Control")
+    modo_auto = st.toggle("Activar Automatización Total (Capa 8)", value=True)
 # =====================================================
 # SESSION STATE
 # =====================================================
@@ -49,29 +51,47 @@ tier = st.sidebar.selectbox("Tipo de Cliente", ["Major", "Mid", "Pyme"])
 
 st.header("Fase 1 — Auditoría de Evidencia")
 
-uploaded_files = st.file_uploader("Subir documentos", accept_multiple_files=True)
+# =====================================================
+# FASE 1 — INGESTA (AUTOMATIZADA O MANUAL)
+# =====================================================
+st.header("Fase 1 — Auditoría de Evidencia")
 
-axis = st.selectbox(
-    "Eje Heptágono",
-    ["Político","Social","Ambiental","Hídrico","Económico","Técnico","Comunicacional"]
-)
+if modo_auto:
+    st.info("SISTEMA EN MODO CAPA 8: Ingesta Web y Clasificación Automática activada.")
+    col1, col2 = st.columns(2)
+    with col1:
+        # Usamos los datos de la sidebar para la búsqueda
+        proyecto_nombre = st.text_input("Confirmar Nombre del Proyecto", value="Proyecto Alpha")
+    with col2:
+        st.write(f"**Región de rastreo:** {region}")
+        st.write(f"**Mineral foco:** {mineral}")
 
-source_type = st.selectbox("Tipo Fuente", ["Oficial","Terceros","Corporativo","Prensa"])
-recency = st.selectbox("Recencia", ["<18m","18-36m",">36m"])
-density = st.selectbox("Densidad Técnica", ["Alta","Media","Baja"])
-sentiment = st.selectbox("Sentimiento", ["Favor","Neutro","Contra"])
-
-if st.button("Agregar documentos"):
-    if uploaded_files:
-        new_docs, discarded = run_ingestion_pipeline(
-            uploaded_files, axis, source_type, recency, density, sentiment
+    if st.button("Ejecutar Captura Automática y Scoring"):
+        # Llamada al nuevo motor que creaste en el Paso 1
+        new_docs = run_harvester_automation(proyecto_nombre, region)
+        st.session_state.documents = new_docs.to_dict('records')
+        
+        # Ejecuta el scoring automáticamente tras la ingesta
+        st.session_state.scoring_results = run_scoring_pipeline(
+            st.session_state.documents, region, mineral, phase
         )
-        st.session_state.documents.extend(new_docs)
-        st.session_state.discarded_docs.extend(discarded)
+        st.success(f"Protocolo TGA cumplido: {len(new_docs)} fuentes procesadas de forma autónoma.")
+else:
+    # MANTIENE TU CÓDIGO ORIGINAL PARA CARGA MANUAL SI APAGAS EL MODO AUTO
+    uploaded_files = st.file_uploader("Subir documentos", accept_multiple_files=True)
+    axis = st.selectbox("Eje Heptágono", ["Político","Social","Ambiental","Hídrico","Económico","Técnico","Comunicacional"])
+    source_type = st.selectbox("Tipo Fuente", ["Oficial","Terceros","Corporativo","Prensa"])
+    recency = st.selectbox("Recencia", ["<18m","18-36m",">36m"])
+    density = st.selectbox("Densidad Técnica", ["Alta","Media","Baja"])
+    sentiment = st.selectbox("Sentimiento", ["Favor","Neutro","Contra"])
 
-# Mostrar progreso hacia 105 fuentes
-st.subheader("Progreso Evidencial")
-st.metric("Fuentes únicas", len(st.session_state.documents), "/ 105")
+    if st.button("Agregar documentos manualmente"):
+        if uploaded_files:
+            new_docs, discarded = run_ingestion_pipeline(
+                uploaded_files, axis, source_type, recency, density, sentiment
+            )
+            st.session_state.documents.extend(new_docs)
+            st.session_state.discarded_docs.extend(discarded)
 
 if st.session_state.discarded_docs:
     st.warning(f"{len(st.session_state.discarded_docs)} documentos descartados por duplicación")
