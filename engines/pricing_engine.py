@@ -1,4 +1,4 @@
-# engines/pricing_engine.py
+def calculate_price(ibh, friccion, isp): # Asegúrate que NO diga calculate_pricing
 # Copiloto Minero v17 — Risk Adjusted Pricing Engine
 
 from engines.fx_engine import get_fx_rate
